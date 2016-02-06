@@ -1,0 +1,10 @@
+**/*.pyc
+*.log
+*.gz
+env
+.idea
+bin
+**/.DS_Store
+build/
+dist/
+**/*.egg-info
