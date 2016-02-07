@@ -68,14 +68,50 @@ logfile = tempfile.mktemp(".log", "trtop-")
 logging.basicConfig(filename=logfile, level=logging.INFO,
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
                 
-custom_analyzer = OutgoingTCPAnalyzer(DefaultWhitelist(), SimpleResolver())
+from trtop.resolver import BaseResolver
+from trtop.analyzer import OutgoingTCPAnalyzer
+from trtop.whitelisting import DefaultWhitelist
+from trtop.reporter import CLICursesOutgoingTCPReporter
+
+class SimpleResolver(BaseResolver):
+
+    def __init__(self):
+        BaseResolver.__init__(self)
+
+    def resolve(self, addr, port):
+        # Tranlate each addr to an Alphabet letter followed by the hash value.
+        names = [c for c in string.ascii_uppercase]
+        return names[hash(addr) % len(names)] + '_' + str(hash(addr))
 
 from trtop import *
-main(default_collector, custom_analyzer, default_reporter)
+custom_analyzer = OutgoingTCPAnalyzer(DefaultWhitelist(), SimpleResolver())
+custom_collector = TCPDumpFileCollector(custom_analyzer, dump_input_filename)
+custom_reporter = CLICursesOutgoingTCPReporter(custom_analyzer, report_filename_prefix)
+
+main(custom_collector, custom_analyzer, custom_reporter)
+
 ```
 
-Your resolver can be extended to fit your expectations, either for static or dynamic resolution. Similarly, you can extend/modify the whitelisting functionality.
+Output:
 
+```
+lqTCP Remote TOPqqqqqqqqqq - analyzer: OutgoingTCPAnalyzerqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk
+x                         Connections                                                                                                                                     Transport                           Pcap        x
+x                                                                                                                                                                                                                         x
+x Host                    Syn(/s)                 Syn/Ack(%)              Est(%)                  Rst(%)      Fin_O(%)    Fin_I(%)    Est Rate    QoS         Lat         Out         In          Rtt         Err         x
+x                                                                                                                                                                                                                         x
+x Z_1542127702888712731   2 (4.29)                1 (50%)                 0 (0%)                  0 (0%)      0 (0%)      0 (0%)      0.00        *           0.00        0           0           0.00        0           x
+x G_7514259239945197122   1 (0.05)                0 (0%)                  0 (0%)                  1 (100%)    0 (0%)      0 (0%)      0.00        *           0.00        0           0           0.00        0           x
+x C_6407528758213011470   1 (0.05)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.05        *           131.73      1           1           220.53      0           x
+x J_1953571102544085007   1 (0.05)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.05        *           169.28      5           4           193.74      0           x
+x V_-8015019010264378117  1 (0.05)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.05        *           109.72      0           0           0.00        0           x
+x D_5122824042368872505   1 (0.05)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.05        *           29.03       4           4           153.48      0           x
+x V_5122824042369872509   1 (0.05)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.05        *           67.62       4           4           58.22       0           x
+x O_2315603488666767378   1 (0.06)                1 (100%)                1 (100%)                0 (0%)      0 (0%)      0 (0%)      0.06        *           16.18       6           7           17.95       0           x
+x S_2315603488668767380   1 (0.06)                1 (100%)                1 (100%)                0 (0%)      1 (100%)    0 (0%)      0.06        4.0         38.78       6           4           26.25       0           x
+
+```
+Your resolver can be extended to fit your expectations, either for static or dynamic resolution. Similarly, you can extend/modify the whitelisting functionality.
 ```
 class SimpleWhitelist(BaseWhitelist):
 
@@ -89,13 +125,31 @@ custom_analyzer = OutgoingTCPAnalyzer(SimpleWhitelist(), SimpleResolver())
 ```
 
 This will only visualize traffic to these two destination, filtering out everything else in the capture file.
+Similarly, the reporter (by default CLI curses)) can be modified/changed to fit your own needs. Simply provide an implementation for the trtop.BaseReporter interface.
 
 ## F.A.Q
 
-* #### Can I use TRTOP for streaming connections eg. Video streams
+* #### Can I use TRTOP for real-time capturing - visualizing ?
+TRTOP is based on the use of tcpdump to read the pcap binary capture. The problem with this dependency is that once the tcpdump consumer process reaches the EOF it halts, no matter if the tcpdump producer is still writing but in a very slow pace. Thus, depending on your environment, if your producer is slower than your consumer, you will only be able to visualize a batch of the data and not all of it. Here is a useful snippet that will make that happen, if you considered the above warning and you still want to try.
+```
+#!/usr/bin/env bash
+
+trap 'jobs -p | xargs kill' EXIT
+trap 'deactivate' EXIT
+trap 'stty sane' EXIT # Exceptions could leave the stty in bad mode
+
+DUMP_OUT="/tmp/simple.pcap_"
+tcpdump -B 8192 -i any -s 100 -w "${DUMP_OUT}" 'tcp' &
+sleep 15 # buffering of traffic in dump file. allow producer a head start.
+python simple.py -i ${DUMP_OUT}
+```
+
+To overcome the above issue, TRTOP has an online/active mode of capturing, which is not yet open sourced. This online mode, is using libpcap directly to capture traffic rather been depended on tcpdump.This active mode is not a silver lining either, because due to Python its not able to process traffic as fast, causing packets to be dropped from Kernel. Work is in progress to modify tcpdump itself, to allow a piped reader.
+
+* #### Can I use TRTOP for streaming connections eg. Video streams ?
 Unfortunately this functionality is not yet supported. TRTOP is mainly useful for the traditional Request/Response model, especially in re-usable connections for subsequent requests - measuring that way performance and latencies.
 
-* #### What are the meanings of the each column of the output.
+* #### What are the meanings of the each column of the output ?
     * **Host:** The remote endpoint as seen in the capture (or the hostname if DNS resolving is on).
     * **Syn:** Count of attempted outgoing connections. In parenthesis: Connections attempt rate per second.
     * **Syn/Ack:** Percentage of successful connection ack from the remote side. (2-way handshake)
@@ -111,7 +165,7 @@ Unfortunately this functionality is not yet supported. TRTOP is mainly useful fo
     * **Rtt:** Round Trip Time, for each individual req/resp.
     * **Err:** Internal errors detected during the capture - invalid packet sequences due to dropped packets.
 
-`Highlighted` entries are values that are considered high.
+    `Highlighted` entries are values that are considered high.
 
 ## Setting up dev-env
 

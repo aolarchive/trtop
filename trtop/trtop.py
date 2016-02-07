@@ -109,7 +109,7 @@ def _signal_handler(collector, analyzer, reporter, signal, frame):
 
 
 def main(collector, analyzer, reporter):
-    logging.info("New TRTOP session with: {0}".format(str((collector, analyzer, reporter))))
+    logging.info("New TRTOP session with: {0}".format(str((collector.__class__, analyzer.__class__, reporter.__class__))))
     signal.signal(signal.SIGINT, partial(_signal_handler, collector, analyzer, reporter))
 
     reporter.start()
