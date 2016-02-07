@@ -27,21 +27,20 @@ class OutgoingTCPAnalyzer(BaseAnalyser):
         self.observer = None
 
     def set_observer(self, observer):
-        logging.debug("Observer is now {0}", observer)
+        logging.debug("Observer is now %s", observer)
         self.observer = observer
 
     def notify_observer(self, tcp_remote):
         self.observer.handle_remote_event(tcp_remote)
 
     def analyse(self, unified_packet):
-        logging.debug("Analyzing {0}", unified_packet)
+        logging.debug("Analyzing %s", unified_packet)
 
         try:
             # TODO handle DNS traffic separate functions
             hostname = self.resolver.resolve(unified_packet.remote_ip(), unified_packet.remote_port())
             tcp_remote = self.tracked_remotes.get(hostname)
-            logging.debug("Packet received for analysis: {0} - resolved to: {1}"
-                          .format(str(unified_packet), str(hostname)))
+            logging.debug("Packet remote resolved to: %s", str(hostname))
 
             if tcp_remote is None:
                 if not self.whitelist.allow(unified_packet.remote_ip(), unified_packet.remote_port()):
@@ -79,6 +78,7 @@ class OutgoingTCPAnalyzer(BaseAnalyser):
             'F': lambda: tcp_remote.process_fin(unified_packet)
         }.get(unified_packet.flags)
 
+        logging.debug("Packet action identifier %s", str(unified_packet.flags))
         return action() if action is not None else False
 
     def _dns_resolved(self, host, hostname):

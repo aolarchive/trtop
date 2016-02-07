@@ -182,7 +182,7 @@ class TcpRemoteState(object):
                 warning("--ERROR({0})-- incorrect state {1} -- outgoing {2}."
                         .format("handle_psh", state, packet.is_outgoing()))
 
-            if fin:
+            if fin and state:
                 self._track_rt_per_connection(packet.ephemeral_port())
                 del self.states[packet.ephemeral_port()]
                 self.fin_out_counter.notify(1) if packet.is_outgoing() else self.fin_in_counter.notify(1)
