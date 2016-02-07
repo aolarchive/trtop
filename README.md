@@ -130,21 +130,23 @@ Similarly, the reporter (by default CLI curses)) can be modified/changed to fit 
 ## F.A.Q
 
 * #### Can I use TRTOP for real-time capturing - visualizing ?
-TRTOP is based on the use of tcpdump to read the pcap binary capture. The problem with this dependency is that once the tcpdump consumer process reaches the EOF it halts, no matter if the tcpdump producer is still writing but in a very slow pace. Thus, depending on your environment, if your producer is slower than your consumer, you will only be able to visualize a batch of the data and not all of it. Here is a useful snippet that will make that happen, if you considered the above warning and you still want to try.
-```
-#!/usr/bin/env bash
 
-trap 'jobs -p | xargs kill' EXIT
-trap 'deactivate' EXIT
-trap 'stty sane' EXIT # Exceptions could leave the stty in bad mode
+    TRTOP is based on the use of tcpdump to read the pcap binary capture. The problem with this dependency is that once the tcpdump consumer process reaches the EOF it halts, no matter if the tcpdump producer is still writing but in a very slow pace. Thus, depending on your environment, if your producer is slower than your consumer, you will only be able to visualize a batch of the data and not all of it. Here is a useful snippet that will make that happen, if you considered the above warning and you still want to try.
 
-DUMP_OUT="/tmp/simple.pcap_"
-tcpdump -B 8192 -i any -s 100 -w "${DUMP_OUT}" 'tcp' &
-sleep 15 # buffering of traffic in dump file. allow producer a head start.
-python simple.py -i ${DUMP_OUT}
-```
-
-To overcome the above issue, TRTOP has an online/active mode of capturing, which is not yet open sourced. This online mode, is using libpcap directly to capture traffic rather been depended on tcpdump.This active mode is not a silver lining either, because due to Python its not able to process traffic as fast, causing packets to be dropped from Kernel. Work is in progress to modify tcpdump itself, to allow a piped reader.
+    ```
+    #!/usr/bin/env bash
+    
+    trap 'jobs -p | xargs kill' EXIT
+    trap 'deactivate' EXIT
+    trap 'stty sane' EXIT # Exceptions could leave the stty in bad mode
+    
+    DUMP_OUT="/tmp/simple.pcap_"
+    tcpdump -B 8192 -i any -s 100 -w "${DUMP_OUT}" 'tcp' &
+    sleep 15 # buffering of traffic in dump file. allow producer a head start.
+    python simple.py -i ${DUMP_OUT}
+    ```
+    
+    To overcome the above issue, TRTOP has an online/active mode of capturing, which is not yet open sourced. This online mode, is using libpcap directly to capture traffic rather been depended on tcpdump.This active mode is not a silver lining either, because due to Python its not able to process traffic as fast, causing packets to be dropped from Kernel. Work is in progress to modify tcpdump itself, to allow a piped reader.
 
 * #### Can I use TRTOP for streaming connections eg. Video streams ?
 Unfortunately this functionality is not yet supported. TRTOP is mainly useful for the traditional Request/Response model, especially in re-usable connections for subsequent requests - measuring that way performance and latencies.
